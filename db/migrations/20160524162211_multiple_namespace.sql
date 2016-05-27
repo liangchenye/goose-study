@@ -14,19 +14,14 @@
 
 -- +goose Up
 
-CREATE TABLE IF NOT EXISTS Namespace (
-  id SERIAL PRIMARY KEY,
-  name VARCHAR(128) NULL);
-
 -- -----------------------------------------------------
--- Update Namespace data
+-- Namespace table and data
 -- -----------------------------------------------------
 ALTER TABLE Namespace ADD version VARCHAR(128) NULL;
-
 UPDATE Namespace SET version = split_part(Namespace.Name, ':', 2), name = split_part(Namespace.Name,':', 1);
 
 -- -----------------------------------------------------
--- Table LayerNamespace
+-- LayerNamespace table and data
 -- -----------------------------------------------------
 CREATE TABLE IF NOT EXISTS LayerNamespace (
         id SERIAL PRIMARY KEY,
@@ -36,26 +31,36 @@ CREATE TABLE IF NOT EXISTS LayerNamespace (
 CREATE INDEX ON LayerNamespace (layer_id);
 CREATE INDEX ON LayerNamespace (layer_id, namespace_id);
 
--- -----------------------------------------------------
--- Update LayerNamespace data
--- -----------------------------------------------------
 INSERT INTO LayerNamespace(layer_id, namespace_id) 
 	SELECT id, namespace_id
 	from Layer;
 
+-- -----------------------------------------------------
+-- Layer table
+-- -----------------------------------------------------
 ALTER TABLE Layer DROP COLUMN namespace_id;
 
 -- +goose Down
+
+-- -----------------------------------------------------
+-- Layer table and data
+-- -----------------------------------------------------
 ALTER TABLE Layer ADD namespace_id INT NULL REFERENCES Namespace;
                           CREATE INDEX ON Layer (namespace_id);
 
-UPDATE Layer SET (namespace_id) =
- (SELECT namespace_id FROM LayerNamespace
-WHERE Layer.id = LayerNamespace.layer_id LIMIT 1);
+UPDATE Layer l SET namespace_id = 
+(SELECT namespace_id from LayerNamespace ln
+WHERE l.id = ln.layer_id LIMIT 1);
 
+-- -----------------------------------------------------
+-- LayerNamespace table (and data)
+-- -----------------------------------------------------
 DROP TABLE IF EXISTS LayerNamespace
             CASCADE;
 
-UPDATE Namespace n SET n.namespace = concat(n.namespace, ':',  n.version);
+-- -----------------------------------------------------
+-- LayerNamespace data and table
+-- -----------------------------------------------------
+UPDATE Namespace n SET name = concat(n.name, ':',  n.version);
 
 ALTER TABLE Namespace DROP COLUMN version;
